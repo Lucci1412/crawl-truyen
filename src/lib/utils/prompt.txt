@@ -97,7 +97,7 @@ Cấu trúc JSON: Đối tượng phải có hai khóa chính: "name" và "dialo
 
 Giữ nguyên dấu câu.
 
-Dấu ngoặc kép " trong lời thoại phải được bao gồm trong chuỗi text.
+Dấu ngoặc kép " trong lời thoại phải được bao gồm trong chuỗi text. Mỗi đoạn text không được dài quá 100, nếu dài quá thì chia nhỏ ra 
 
 Lưu ý: Đảm bảo các ký tự đặc biệt trong chuỗi JSON (ví dụ: dấu ngoặc kép ") được thoát đúng cách (ví dụ: \").
 

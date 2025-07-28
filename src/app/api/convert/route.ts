@@ -13,6 +13,11 @@ export async function POST(request: NextRequest) {
         const body = await request.json();
         const { truyenName, startChapter, endChapter, apiKey } = body;
 
+        console.log("Debug - API convert received:");
+        console.log("truyenName:", truyenName);
+        console.log("startChapter:", startChapter, "type:", typeof startChapter);
+        console.log("endChapter:", endChapter, "type:", typeof endChapter);
+
         // Validate input
         if (!truyenName || !startChapter || !endChapter || !apiKey) {
           controller.enqueue(
@@ -391,21 +396,48 @@ export async function POST(request: NextRequest) {
           }
         };
 
-        // Process chapters in parallel
+        // Process chapters in parallel - only process existing files
         const chapterPromises = [];
+        const existingChapters = [];
+
+        // Check which chapters actually exist
         for (let chapter = startChapter; chapter <= endChapter; chapter++) {
-          chapterPromises.push(processChapter(chapter));
+          const chapterFile = path.join(textPath, `${chapter}.txt`);
+          if (fs.existsSync(chapterFile)) {
+            existingChapters.push(chapter);
+            chapterPromises.push(processChapter(chapter));
+          } else {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  message: `Bỏ qua chương ${chapter} - file không tồn tại`,
+                })}\n\n`
+              )
+            );
+          }
         }
 
-        // Wait for all chapters to complete
+        if (existingChapters.length === 0) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                error: "Không tìm thấy file nào trong phạm vi chương đã chọn",
+              })}\n\n`
+            )
+          );
+          controller.close();
+          return;
+        }
+
+        // Wait for all existing chapters to complete
         await Promise.all(chapterPromises);
 
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
               message: `Hoàn thành convert ${
-                endChapter - startChapter + 1
-              } chương!`,
+                existingChapters.length
+              } chương (${existingChapters.join(", ")})!`,
               completed: true,
             })}\n\n`
           )

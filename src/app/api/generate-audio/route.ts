@@ -50,12 +50,30 @@ import asyncio
 import edge_tts
 import sys
 import os
+import re
 
 async def generate_audio(text, voice, rate, pitch, output_path):
     try:
+        # Clean text - remove special characters that might cause issues
+        # Keep original text without cleaning
+        text = text.strip()
+        
+        # Ensure text is not empty
+        if not text:
+            print("Error: Empty text", file=sys.stderr)
+            return False
+        
+        # Generate audio directly without length limits
         communicate = edge_tts.Communicate(text, voice, rate=rate, pitch=pitch)
         await communicate.save(output_path)
-        return True
+        
+        # Check if file was actually created and has content
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            return True
+        else:
+            print("Error: No audio was received. Please verify that your parameters are correct.", file=sys.stderr)
+            return False
+            
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return False
@@ -74,6 +92,13 @@ async def main():
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     
+    # Debug info
+    print(f"Debug: text length = {len(text)}", file=sys.stderr)
+    print(f"Debug: voice = {voice}", file=sys.stderr)
+    print(f"Debug: rate = {rate}", file=sys.stderr)
+    print(f"Debug: pitch = {pitch}", file=sys.stderr)
+    print(f"Debug: output_path = {output_path}", file=sys.stderr)
+    
     success = await generate_audio(text, voice, rate, pitch, output_path)
     if success:
         print("SUCCESS")
@@ -88,6 +113,32 @@ if __name__ == "__main__":
         const scriptPath = path.join(process.cwd(), "tts_script.py");
         fs.writeFileSync(scriptPath, pythonScript);
 
+        // Make script executable on Unix systems
+        if (process.platform !== "win32") {
+          try {
+            await execAsync(`chmod +x "${scriptPath}"`);
+          } catch (error) {
+            console.log("Could not make script executable:", error);
+          }
+        }
+
+        // Detect available Python command
+        let pythonCommand = "python3";
+        try {
+          await execAsync("python3 --version");
+        } catch (error) {
+          console.log(error);
+          try {
+            await execAsync("python --version");
+            pythonCommand = "python";
+          } catch (error2) {
+            console.error("Neither python3 nor python is available");
+            console.log(error2);
+            pythonCommand = "python3"; // fallback
+          }
+        }
+        console.log(`Using Python command: ${pythonCommand}`);
+
         // Process all dialogues from all chapters in parallel
         const allDialogues: Array<{
           chapter: number;
@@ -95,7 +146,15 @@ if __name__ == "__main__":
           dialogue: any;
         }> = [];
 
-        // Collect all dialogues from all chapters
+        // Collect dialogues from all chapters into separate arrays
+        const chapterDialogues: {
+          [chapter: number]: Array<{
+            chapter: number;
+            dialogueIndex: number;
+            dialogue: any;
+          }>;
+        } = {};
+
         for (let chapter = startChapter; chapter <= endChapter; chapter++) {
           try {
             const jsonPath = path.join(
@@ -133,13 +192,14 @@ if __name__ == "__main__":
               )
             );
 
-            // Add all dialogues from this chapter to the queue
+            // Create separate array for this chapter
+            chapterDialogues[chapter] = [];
             for (
               let dialogueIndex = 0;
               dialogueIndex < dialogues.length;
               dialogueIndex++
             ) {
-              allDialogues.push({
+              chapterDialogues[chapter].push({
                 chapter,
                 dialogueIndex,
                 dialogue: dialogues[dialogueIndex],
@@ -172,19 +232,8 @@ if __name__ == "__main__":
             return;
           }
 
-          // Clean and prepare text for TTS
-          let cleanText = text
-            .replace(/"/g, '\\"')
-            .replace(/\n/g, " ")
-            .replace(/\r/g, " ")
-            .replace(/\t/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
-
-          // Limit text length to avoid TTS issues
-          if (cleanText.length > 500) {
-            cleanText = cleanText.substring(0, 500) + "...";
-          }
+          // Keep original text without cleaning
+          const cleanText = text.trim();
 
           // Skip empty text
           if (!cleanText || cleanText.length === 0) {
@@ -217,6 +266,11 @@ if __name__ == "__main__":
           const audioFileName = `${dialogueNumber}_${role}_${year}${month}.mp3`;
           const audioFilePath = path.join(chapterAudioPath, audioFileName);
 
+          // Ensure path is absolute for Ubuntu
+          const absoluteAudioFilePath = path.isAbsolute(audioFilePath)
+            ? audioFilePath
+            : path.resolve(audioFilePath);
+
           let retryCount = 0;
           const maxRetries = 3;
           let success = false;
@@ -228,30 +282,47 @@ if __name__ == "__main__":
                 voiceSettings[role as keyof typeof voiceSettings] ||
                 voiceSettings.S0;
 
-              // Generate audio using Python script - use 'python' on Windows, 'python3' on Linux/Mac
-              const pythonCommand =
-                process.platform === "win32"
-                  ? `python "${scriptPath}" "${cleanText}" "${voiceSetting.voice}" "${voiceSetting.rate}" "${voiceSetting.pitch}" "${audioFilePath}"`
-                  : `python3 "${scriptPath}" "${cleanText}" "${voiceSetting.voice}" "${voiceSetting.rate}" "${voiceSetting.pitch}" "${audioFilePath}"`;
+              // Generate audio using Python script
+              // Basic escape for command line
+              const escapedText = cleanText.replace(/"/g, '\\"');
 
-              const result = await execAsync(pythonCommand);
-              console.log(`TTS Command output:`, result.stdout);
+              const ttsCommand = `${pythonCommand} "${scriptPath}" "${escapedText}" "${voiceSetting.voice}" "${voiceSetting.rate}" "${voiceSetting.pitch}" "${absoluteAudioFilePath}"`;
+
+              // console.log(`TTS Command: ${ttsCommand}`);
+
+              let result;
+              try {
+                result = await execAsync(ttsCommand);
+              } catch (error) {
+                console.error("Python command failed:", error);
+                throw error;
+              }
+              // console.log(`TTS Command output:`, result.stdout);
+              // console.log(`TTS Command stderr:`, result.stderr);
 
               if (result.stdout.includes("SUCCESS")) {
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      message: `Chương ${chapter} - ${dialogueNumber}_${role}: ${text.substring(
-                        0,
-                        50
-                      )}...`,
-                      chapter,
-                      dialogueIndex,
-                      type: "success",
-                    })}\n\n`
-                  )
-                );
-                success = true;
+                // Double check if file was actually created
+                if (
+                  fs.existsSync(absoluteAudioFilePath) &&
+                  fs.statSync(absoluteAudioFilePath).size > 0
+                ) {
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        message: `Chương ${chapter} - ${dialogueNumber}_${role}: ${text.substring(
+                          0,
+                          50
+                        )}...`,
+                        chapter,
+                        dialogueIndex,
+                        type: "success",
+                      })}\n\n`
+                    )
+                  );
+                  success = true;
+                } else {
+                  throw new Error("Audio file was not created or is empty");
+                }
               } else {
                 throw new Error("Python script failed");
               }
@@ -295,20 +366,100 @@ if __name__ == "__main__":
           }
         };
 
-        // Process all dialogues from all chapters in parallel
+        // Process all chapters in parallel
+        const totalDialogues = Object.values(chapterDialogues).reduce(
+          (sum, dialogues) => sum + dialogues.length,
+          0
+        );
         controller.enqueue(
           encoder.encode(
             `data: ${JSON.stringify({
-              message: `Bắt đầu xử lý ${allDialogues.length} dialogues từ ${
+              message: `Bắt đầu xử lý ${totalDialogues} dialogues từ ${
                 endChapter - startChapter + 1
-              } chương song song...`,
+              } chương song song (đa luồng toàn cục)...`,
             })}\n\n`
           )
         );
 
-        // Process all dialogues in parallel with limited concurrency
-        const promises = allDialogues.map(processDialogue);
-        await Promise.all(promises);
+        const chapterOrder = Object.keys(chapterDialogues)
+          .map(Number)
+          .sort((a, b) => a - b);
+
+        // Process each chapter in parallel
+        const processChapter = async (chapter: number) => {
+          const dialogues = chapterDialogues[chapter];
+
+          // Send status: in progress
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                message: `Chương ${chapter} - Đang xử lý...`,
+                chapter,
+                type: "chapter_status",
+                status: "in_progress",
+                totalDialogues: dialogues.length,
+                completedDialogues: 0,
+              })}\n\n`
+            )
+          );
+
+          // Process dialogues within this chapter with limited concurrency
+          const concurrencyLimit = 3;
+          const chunks = [];
+          for (let i = 0; i < dialogues.length; i += concurrencyLimit) {
+            chunks.push(dialogues.slice(i, i + concurrencyLimit));
+          }
+
+          let completedDialogues = 0;
+          for (let i = 0; i < chunks.length; i++) {
+            const chunk = chunks[i];
+            const promises = chunk.map(processDialogue);
+            await Promise.all(promises);
+
+            completedDialogues += chunk.length;
+
+            // Update progress
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  message: `Chương ${chapter} - ${completedDialogues}/${dialogues.length} dialogues`,
+                  chapter,
+                  type: "chapter_progress",
+                  status: "in_progress",
+                  totalDialogues: dialogues.length,
+                  completedDialogues: completedDialogues,
+                  progress: Math.round(
+                    (completedDialogues / dialogues.length) * 100
+                  ),
+                })}\n\n`
+              )
+            );
+
+            // Small delay between chunks
+            if (i < chunks.length - 1) {
+              await new Promise((resolve) => setTimeout(resolve, 100));
+            }
+          }
+
+          // Send status: completed
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                message: `Chương ${chapter} - Hoàn thành`,
+                chapter,
+                type: "chapter_status",
+                status: "completed",
+                totalDialogues: dialogues.length,
+                completedDialogues: dialogues.length,
+                progress: 100,
+              })}\n\n`
+            )
+          );
+        };
+
+        // Process all chapters in parallel
+        const chapterPromises = chapterOrder.map(processChapter);
+        await Promise.all(chapterPromises);
 
         // Clean up Python script
         try {
