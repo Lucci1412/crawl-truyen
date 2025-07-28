@@ -228,8 +228,11 @@ if __name__ == "__main__":
                 voiceSettings[role as keyof typeof voiceSettings] ||
                 voiceSettings.S0;
 
-              // Generate audio using Python script
-              const pythonCommand = `python3 "${scriptPath}" "${cleanText}" "${voiceSetting.voice}" "${voiceSetting.rate}" "${voiceSetting.pitch}" "${audioFilePath}"`;
+              // Generate audio using Python script - use 'python' on Windows, 'python3' on Linux/Mac
+              const pythonCommand =
+                process.platform === "win32"
+                  ? `python "${scriptPath}" "${cleanText}" "${voiceSetting.voice}" "${voiceSetting.rate}" "${voiceSetting.pitch}" "${audioFilePath}"`
+                  : `python3 "${scriptPath}" "${cleanText}" "${voiceSetting.voice}" "${voiceSetting.rate}" "${voiceSetting.pitch}" "${audioFilePath}"`;
 
               const result = await execAsync(pythonCommand);
               console.log(`TTS Command output:`, result.stdout);

@@ -540,6 +540,35 @@ export default function Home() {
     setMergeProgress(0);
   };
 
+  const handleDownloadMerge = async (
+    truyenName: string,
+    startChapter: number,
+    endChapter: number
+  ) => {
+    try {
+      const response = await fetch(
+        `/api/download-merge?truyen=${truyenName}&startChapter=${startChapter}&endChapter=${endChapter}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Download merge failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${truyenName}_${startChapter}-${endChapter}_merge_audio.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error("Download merge error:", error);
+      alert("Lỗi khi download file merge audio!");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-6xl mx-auto">
@@ -1095,7 +1124,18 @@ export default function Home() {
 
               {mergeLog && (
                 <div className="space-y-2">
-                  <Label>Log</Label>
+                  <div className="flex justify-between items-center">
+                    <Label>Log</Label>
+                    {selectedTruyenForMerge && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleDownloadMerge(selectedTruyenForMerge, startMergeChapter, endMergeChapter)}
+                      >
+                        📥 Download Merge Audio
+                      </Button>
+                    )}
+                  </div>
                   <Textarea
                     value={mergeLog}
                     readOnly
