@@ -1,0 +1,29 @@
+name: Deployment Crawl_Truyen
+
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy using ssh
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: 22
+          script: |
+            cd /home/crawl_truyen
+            git fetch origin
+            git checkout main
+            git pull
+            docker build -t crawl_truyen .
+            docker image prune -f
+            docker stop crawl_truyen_container || true
+            docker rm crawl_truyen_container || true
+            docker run -d --name crawl_truyen_container -p 9999:3000 crawl_truyen
