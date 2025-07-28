@@ -88,7 +88,31 @@ export async function POST(request: NextRequest) {
             originalConsoleLog(...args);
           };
 
-          await crawler.crawl(title, startChapter, endChapter, includeTitle);
+          // Process chapters in parallel with limited concurrency
+          const maxConcurrent = 5; // Process 5 chapters at once
+          const chapters = [];
+          for (let chapter = startChapter; chapter <= endChapter; chapter++) {
+            chapters.push(chapter);
+          }
+
+          // Process chapters in batches
+          for (let i = 0; i < chapters.length; i += maxConcurrent) {
+            const batch = chapters.slice(i, i + maxConcurrent);
+            const promises = batch.map(async (chapter) => {
+              try {
+                await crawler.crawlChapter(title, chapter, includeTitle);
+              } catch (error) {
+                console.error(`Lỗi khi crawl chương ${chapter}:`, error);
+              }
+            });
+
+            await Promise.all(promises);
+            
+            // Delay between batches
+            if (i + maxConcurrent < chapters.length) {
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+          }
 
           // Restore console.log
           console.log = originalConsoleLog;

@@ -59,6 +59,48 @@ export class TruyenFullCrawler {
     }
   }
 
+  async crawlChapter(
+    title: string,
+    chapter: number,
+    includeTitle: boolean = true
+  ): Promise<void> {
+    try {
+      console.log(`Đang crawl chương ${chapter}...`);
+
+      const chapterUrl = `${this.baseUrl}/${title}/chuong-${chapter}.html`;
+      const content = await this.fetchChapterContent(chapterUrl, includeTitle);
+
+      if (content) {
+        // Create directory structure
+        const desktopPath = path.join(
+          process.env.USERPROFILE || "",
+          "Desktop",
+          "truyen"
+        );
+        const truyenPath = path.join(desktopPath, title);
+        const textPath = path.join(truyenPath, "text");
+
+        if (!fs.existsSync(desktopPath)) {
+          fs.mkdirSync(desktopPath, { recursive: true });
+        }
+        if (!fs.existsSync(truyenPath)) {
+          fs.mkdirSync(truyenPath, { recursive: true });
+        }
+        if (!fs.existsSync(textPath)) {
+          fs.mkdirSync(textPath, { recursive: true });
+        }
+
+        const chapterFile = path.join(textPath, `${chapter}.txt`);
+        fs.writeFileSync(chapterFile, content, "utf8");
+        console.log(`chương ${chapter} - done`);
+      } else {
+        console.log(`chương ${chapter} - lỗi`);
+      }
+    } catch (error) {
+      console.error(`Lỗi khi crawl chương ${chapter}:`, error);
+    }
+  }
+
   private async fetchChapterContent(
     url: string,
     includeTitle: boolean = true

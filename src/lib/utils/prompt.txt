@@ -103,7 +103,8 @@ Lưu ý: Đảm bảo các ký tự đặc biệt trong chuỗi JSON (ví dụ: 
 
 Phân đoạn hợp lý:
 
-Mỗi đoạn tường thuật ngắn nên là một mục riêng.
+Mỗi đoạn tường thuật ngắn nên là một mục riêng.Không nên để quá dài, tách ra làm 2 hoặc 3 đoạn nhỏ nếu quá 200 từ 
+
 
 Mỗi lượt lời thoại của nhân vật là một mục riêng. Nếu một lượt lời thoại quá dài, có thể cân nhắc tách ra ở những điểm ngắt nghỉ tự nhiên.
 

@@ -23,7 +23,9 @@ import { Progress } from "@/components/ui/progress";
 import { AVAILABLE_SOURCES } from "@/lib/constants";
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<"crawl" | "convert">("crawl");
+  const [activeTab, setActiveTab] = useState<
+    "crawl" | "convert" | "generate-audio" | "merge-audio"
+  >("crawl");
 
   // Crawl state
   const [sourceName, setSourceName] = useState("Tàng Thư Viện");
@@ -48,6 +50,28 @@ export default function Home() {
   const [convertLog, setConvertLog] = useState("");
   const [isConverting, setIsConverting] = useState(false);
   const [convertProgress, setConvertProgress] = useState(0);
+
+  // Generate Audio state
+  const [selectedTruyenForAudio, setSelectedTruyenForAudio] = useState("");
+  const [startAudioChapter, setStartAudioChapter] = useState(1);
+  const [endAudioChapter, setEndAudioChapter] = useState(10);
+  const [audioLog, setAudioLog] = useState("");
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const [chapterLogs, setChapterLogs] = useState<{ [key: number]: string[] }>(
+    {}
+  );
+
+  // Merge Audio state
+  const [selectedTruyenForMerge, setSelectedTruyenForMerge] = useState("");
+  const [startMergeChapter, setStartMergeChapter] = useState(1);
+  const [endMergeChapter, setEndMergeChapter] = useState(10);
+
+  const [mergeLog, setMergeLog] = useState("");
+  const [isMergingAudio, setIsMergingAudio] = useState(false);
+  const [isMergePaused, setIsMergePaused] = useState(false);
+  const [mergeProgress, setMergeProgress] = useState(0);
 
   const availableSources = AVAILABLE_SOURCES;
 
@@ -296,6 +320,178 @@ export default function Home() {
     }
   };
 
+  const handleGenerateAudio = async () => {
+    if (!selectedTruyenForAudio || !startAudioChapter || !endAudioChapter) {
+      alert("Vui lòng nhập đầy đủ thông tin!");
+      return;
+    }
+
+    setIsGeneratingAudio(true);
+    setIsPaused(false);
+    setAudioLog("");
+    setAudioProgress(0);
+    setChapterLogs({});
+
+    try {
+      const response = await fetch("/api/generate-audio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          truyenName: selectedTruyenForAudio,
+          startChapter: startAudioChapter,
+          endChapter: endAudioChapter,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              setAudioLog((prev) => prev + data.message + "\n");
+
+              // Update chapter-specific logs
+              if (data.chapter) {
+                setChapterLogs((prev) => {
+                  const chapterLog = prev[data.chapter] || [];
+                  return {
+                    ...prev,
+                    [data.chapter]: [...chapterLog, data.message],
+                  };
+                });
+              }
+
+              if (data.completed) {
+                setAudioProgress(100);
+              } else if (data.message.includes("Chương")) {
+                const chapterMatch = data.message.match(/Chương (\d+)/);
+                if (chapterMatch) {
+                  const currentChapter = parseInt(chapterMatch[1]);
+                  const progress =
+                    ((currentChapter - startAudioChapter + 1) /
+                      (endAudioChapter - startAudioChapter + 1)) *
+                    100;
+                  setAudioProgress(Math.min(progress, 100));
+                }
+              }
+            } catch (e) {
+              console.error("Error parsing SSE data:", e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      setAudioLog((prev) => prev + `\nLỗi: ${error}`);
+    } finally {
+      setIsGeneratingAudio(false);
+      setIsPaused(false);
+    }
+  };
+
+  const handlePauseResumeAudio = () => {
+    setIsPaused(!isPaused);
+  };
+
+  const handleStopAudio = () => {
+    setIsGeneratingAudio(false);
+    setIsPaused(false);
+    setAudioProgress(0);
+  };
+
+  const handleMergeAudio = async () => {
+    if (!selectedTruyenForMerge || !startMergeChapter || !endMergeChapter) {
+      alert("Vui lòng nhập đầy đủ thông tin!");
+      return;
+    }
+
+    setIsMergingAudio(true);
+    setIsMergePaused(false);
+    setMergeLog("");
+    setMergeProgress(0);
+
+    try {
+      const response = await fetch("/api/merge-audio", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          truyenName: selectedTruyenForMerge,
+          startChapter: startMergeChapter,
+          endChapter: endMergeChapter,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Network response was not ok");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              setMergeLog((prev) => prev + data.message + "\n");
+
+              if (data.completed) {
+                setMergeProgress(100);
+              }
+            } catch (e) {
+              console.error("Error parsing SSE data:", e);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      setMergeLog((prev) => prev + `\nLỗi: ${error}`);
+    } finally {
+      setIsMergingAudio(false);
+      setIsMergePaused(false);
+    }
+  };
+
+  const handlePauseResumeMerge = () => {
+    setIsMergePaused(!isMergePaused);
+  };
+
+  const handleStopMerge = () => {
+    setIsMergingAudio(false);
+    setIsMergePaused(false);
+    setMergeProgress(0);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <div className="max-w-6xl mx-auto">
@@ -322,6 +518,20 @@ export default function Home() {
             className="flex-1"
           >
             🔄 Convert JSON
+          </Button>
+          <Button
+            variant={activeTab === "generate-audio" ? "default" : "outline"}
+            onClick={() => setActiveTab("generate-audio")}
+            className="flex-1"
+          >
+            🔊 Generate Audio
+          </Button>
+          <Button
+            variant={activeTab === "merge-audio" ? "default" : "outline"}
+            onClick={() => setActiveTab("merge-audio")}
+            className="flex-1"
+          >
+            🎵 Merge Audio
           </Button>
         </div>
 
@@ -594,8 +804,248 @@ export default function Home() {
           </Card>
         )}
 
+        {activeTab === "generate-audio" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Generate Audio</CardTitle>
+              <CardDescription>
+                Tạo file audio từ JSON files sử dụng edge-tts
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="truyenForAudio">Truyện</Label>
+                  <Select
+                    value={selectedTruyenForAudio}
+                    onValueChange={setSelectedTruyenForAudio}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn truyện" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {truyenList.map((truyen) => (
+                        <SelectItem key={truyen} value={truyen}>
+                          {truyen}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="startAudioChapter">Chương bắt đầu</Label>
+                  <Input
+                    id="startAudioChapter"
+                    type="number"
+                    value={startAudioChapter}
+                    onChange={(e) =>
+                      setStartAudioChapter(parseInt(e.target.value) || 1)
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="endAudioChapter">Chương kết thúc</Label>
+                  <Input
+                    id="endAudioChapter"
+                    type="number"
+                    value={endAudioChapter}
+                    onChange={(e) =>
+                      setEndAudioChapter(parseInt(e.target.value) || 10)
+                    }
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleGenerateAudio}
+                  disabled={isGeneratingAudio}
+                  className="flex-1"
+                >
+                  {isGeneratingAudio
+                    ? "Đang generate audio..."
+                    : "Bắt đầu Generate Audio"}
+                </Button>
+
+                {isGeneratingAudio && (
+                  <>
+                    <Button
+                      onClick={handlePauseResumeAudio}
+                      variant="outline"
+                      className="px-4"
+                    >
+                      {isPaused ? "▶️ Tiếp tục" : "⏸️ Tạm dừng"}
+                    </Button>
+                    <Button
+                      onClick={handleStopAudio}
+                      variant="destructive"
+                      className="px-4"
+                    >
+                      ⏹️ Dừng
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {isGeneratingAudio && (
+                <div className="space-y-2">
+                  <Progress value={audioProgress} className="w-full" />
+                  <p className="text-sm text-gray-600">
+                    Tiến độ: {audioProgress.toFixed(1)}%
+                  </p>
+                </div>
+              )}
+
+              {Object.keys(chapterLogs).length > 0 && (
+                <div className="space-y-2">
+                  <Label>Log Theo Chương</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Object.entries(chapterLogs).map(([chapter, logs]) => (
+                      <div
+                        key={chapter}
+                        className="border rounded-lg p-3 bg-gray-50"
+                      >
+                        <h4 className="font-semibold text-sm mb-2">
+                          Chương {chapter}
+                        </h4>
+                        <div className="max-h-32 overflow-y-auto">
+                          {logs.map((log, index) => (
+                            <div key={index} className="text-xs font-mono mb-1">
+                              {log}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {activeTab === "merge-audio" && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Merge Audio</CardTitle>
+              <CardDescription>
+                Ghép các file audio thành một file hoàn chỉnh
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="truyenForMerge">Truyện</Label>
+                  <Select
+                    value={selectedTruyenForMerge}
+                    onValueChange={setSelectedTruyenForMerge}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Chọn truyện" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {truyenList.map((truyen) => (
+                        <SelectItem key={truyen} value={truyen}>
+                          {truyen}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="startMergeChapter">Chương bắt đầu</Label>
+                  <Input
+                    id="startMergeChapter"
+                    type="number"
+                    value={startMergeChapter}
+                    onChange={(e) =>
+                      setStartMergeChapter(parseInt(e.target.value) || 1)
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="endMergeChapter">Chương kết thúc</Label>
+                  <Input
+                    id="endMergeChapter"
+                    type="number"
+                    value={endMergeChapter}
+                    onChange={(e) =>
+                      setEndMergeChapter(parseInt(e.target.value) || 10)
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Phạm vi chương merge</Label>
+                  <div className="text-sm text-gray-600 p-2 bg-gray-50 rounded">
+                    Chương {startMergeChapter} - {endMergeChapter}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleMergeAudio}
+                  disabled={isMergingAudio}
+                  className="flex-1"
+                >
+                  {isMergingAudio
+                    ? "Đang merge audio..."
+                    : "Bắt đầu Merge Audio"}
+                </Button>
+
+                {isMergingAudio && (
+                  <>
+                    <Button
+                      onClick={handlePauseResumeMerge}
+                      variant="outline"
+                      className="px-4"
+                    >
+                      {isMergePaused ? "▶️ Tiếp tục" : "⏸️ Tạm dừng"}
+                    </Button>
+                    <Button
+                      onClick={handleStopMerge}
+                      variant="destructive"
+                      className="px-4"
+                    >
+                      ⏹️ Dừng
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {isMergingAudio && (
+                <div className="space-y-2">
+                  <Progress value={mergeProgress} className="w-full" />
+                  <p className="text-sm text-gray-600">
+                    Tiến độ: {mergeProgress.toFixed(1)}%
+                  </p>
+                </div>
+              )}
+
+              {mergeLog && (
+                <div className="space-y-2">
+                  <Label>Log</Label>
+                  <Textarea
+                    value={mergeLog}
+                    readOnly
+                    className="h-40 font-mono text-sm"
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <div className="mt-8 text-center text-sm text-gray-500">
-          <p>Files được lưu tại: Desktop/truyen/[tên-truyen]/text/ và json/</p>
+          <p>
+            Files được lưu tại: Desktop/truyen/[tên-truyen]/text/, json/, và
+            audio/[số-chương]/
+          </p>
         </div>
       </div>
     </div>
