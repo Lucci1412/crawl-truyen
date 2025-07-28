@@ -229,7 +229,7 @@ if __name__ == "__main__":
                 voiceSettings.S0;
 
               // Generate audio using Python script
-              const pythonCommand = `python "${scriptPath}" "${cleanText}" "${voiceSetting.voice}" "${voiceSetting.rate}" "${voiceSetting.pitch}" "${audioFilePath}"`;
+              const pythonCommand = `python3 "${scriptPath}" "${cleanText}" "${voiceSetting.voice}" "${voiceSetting.rate}" "${voiceSetting.pitch}" "${audioFilePath}"`;
 
               const result = await execAsync(pythonCommand);
               console.log(`TTS Command output:`, result.stdout);
