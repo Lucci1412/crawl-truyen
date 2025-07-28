@@ -231,22 +231,28 @@ export default function Home() {
                 continue;
               }
 
-              setCrawlLog((prev) => prev + data.message + "\n");
+              // Validate data.message exists before using it
+              if (data.message) {
+                setCrawlLog((prev) => prev + data.message + "\n");
 
-              if (data.completed) {
-                setCrawlProgress(100);
-                // Add title to crawled titles when crawl is completed
-                addCrawledTitle(title);
-              } else if (data.message.includes("Đang crawl chương")) {
-                const chapterMatch = data.message.match(/chương (\d+)/);
-                if (chapterMatch) {
-                  const currentChapter = parseInt(chapterMatch[1]);
-                  const progress =
-                    ((currentChapter - startChapter + 1) /
-                      (endChapter - startChapter + 1)) *
-                    100;
-                  setCrawlProgress(Math.min(progress, 100));
+                if (data.completed) {
+                  setCrawlProgress(100);
+                  // Add title to crawled titles when crawl is completed
+                  addCrawledTitle(title);
+                } else if (data.message.includes("Đang crawl chương")) {
+                  const chapterMatch = data.message.match(/chương (\d+)/);
+                  if (chapterMatch) {
+                    const currentChapter = parseInt(chapterMatch[1]);
+                    const progress =
+                      ((currentChapter - startChapter + 1) /
+                        (endChapter - startChapter + 1)) *
+                      100;
+                    setCrawlProgress(Math.min(progress, 100));
+                  }
                 }
+              } else if (data.error) {
+                // Handle error messages
+                setCrawlLog((prev) => prev + `Lỗi: ${data.error}\n`);
               }
             } catch (e) {
               console.error("Error parsing SSE data:", e);
@@ -312,21 +318,28 @@ export default function Home() {
           if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
-              setConvertLog((prev) => prev + data.message + "\n");
 
-              if (data.completed) {
-                setConvertProgress(100);
-              } else if (data.message.includes("Đang phân tích chương")) {
-                const chapterMatch = data.message.match(/chương (\d+)-(\d+)/);
-                if (chapterMatch) {
-                  const start = parseInt(chapterMatch[1]);
-                  const end = parseInt(chapterMatch[2]);
-                  const progress =
-                    ((start - startConvertChapter + 1) /
-                      (endConvertChapter - startConvertChapter + 1)) *
-                    100;
-                  setConvertProgress(Math.min(progress, 100));
+              // Validate data.message exists before using it
+              if (data.message) {
+                setConvertLog((prev) => prev + data.message + "\n");
+
+                if (data.completed) {
+                  setConvertProgress(100);
+                } else if (data.message.includes("Đang phân tích chương")) {
+                  const chapterMatch = data.message.match(/chương (\d+)-(\d+)/);
+                  if (chapterMatch) {
+                    const start = parseInt(chapterMatch[1]);
+                    const end = parseInt(chapterMatch[2]);
+                    const progress =
+                      ((start - startConvertChapter + 1) /
+                        (endConvertChapter - startConvertChapter + 1)) *
+                      100;
+                    setConvertProgress(Math.min(progress, 100));
+                  }
                 }
+              } else if (data.error) {
+                // Handle error messages
+                setConvertLog((prev) => prev + `Lỗi: ${data.error}\n`);
               }
             } catch (e) {
               console.error("Error parsing SSE data:", e);
@@ -388,31 +401,38 @@ export default function Home() {
           if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
-              setAudioLog((prev) => prev + data.message + "\n");
 
-              // Update chapter-specific logs
-              if (data.chapter) {
-                setChapterLogs((prev) => {
-                  const chapterLog = prev[data.chapter] || [];
-                  return {
-                    ...prev,
-                    [data.chapter]: [...chapterLog, data.message],
-                  };
-                });
-              }
+              // Validate data.message exists before using it
+              if (data.message) {
+                setAudioLog((prev) => prev + data.message + "\n");
 
-              if (data.completed) {
-                setAudioProgress(100);
-              } else if (data.message.includes("Chương")) {
-                const chapterMatch = data.message.match(/Chương (\d+)/);
-                if (chapterMatch) {
-                  const currentChapter = parseInt(chapterMatch[1]);
-                  const progress =
-                    ((currentChapter - startAudioChapter + 1) /
-                      (endAudioChapter - startAudioChapter + 1)) *
-                    100;
-                  setAudioProgress(Math.min(progress, 100));
+                // Update chapter-specific logs
+                if (data.chapter) {
+                  setChapterLogs((prev) => {
+                    const chapterLog = prev[data.chapter] || [];
+                    return {
+                      ...prev,
+                      [data.chapter]: [...chapterLog, data.message],
+                    };
+                  });
                 }
+
+                if (data.completed) {
+                  setAudioProgress(100);
+                } else if (data.message.includes("Chương")) {
+                  const chapterMatch = data.message.match(/Chương (\d+)/);
+                  if (chapterMatch) {
+                    const currentChapter = parseInt(chapterMatch[1]);
+                    const progress =
+                      ((currentChapter - startAudioChapter + 1) /
+                        (endAudioChapter - startAudioChapter + 1)) *
+                      100;
+                    setAudioProgress(Math.min(progress, 100));
+                  }
+                }
+              } else if (data.error) {
+                // Handle error messages
+                setAudioLog((prev) => prev + `Lỗi: ${data.error}\n`);
               }
             } catch (e) {
               console.error("Error parsing SSE data:", e);
@@ -484,10 +504,17 @@ export default function Home() {
           if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
-              setMergeLog((prev) => prev + data.message + "\n");
 
-              if (data.completed) {
-                setMergeProgress(100);
+              // Validate data.message exists before using it
+              if (data.message) {
+                setMergeLog((prev) => prev + data.message + "\n");
+
+                if (data.completed) {
+                  setMergeProgress(100);
+                }
+              } else if (data.error) {
+                // Handle error messages
+                setMergeLog((prev) => prev + `Lỗi: ${data.error}\n`);
               }
             } catch (e) {
               console.error("Error parsing SSE data:", e);
