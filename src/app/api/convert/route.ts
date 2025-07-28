@@ -1,3 +1,4 @@
+/* eslint-disable prefer-const */
 import { NextRequest } from "next/server";
 import fs from "fs";
 import path from "path";
@@ -150,10 +151,7 @@ export async function POST(request: NextRequest) {
                 try {
                   parsedContent = JSON.parse(jsonMatch[0]);
                 } catch (e) {
-                  console.log(
-                    `Method 1 failed for chapter ${chapter}:`,
-                    e.message
-                  );
+                  console.log(`Method 1 failed for chapter ${chapter}:`, e);
                 }
               }
 
@@ -164,10 +162,7 @@ export async function POST(request: NextRequest) {
                   try {
                     parsedContent = JSON.parse(jsonMatch2[0]);
                   } catch (e) {
-                    console.log(
-                      `Method 2 failed for chapter ${chapter}:`,
-                      e.message
-                    );
+                    console.log(`Method 2 failed for chapter ${chapter}:`, e);
                   }
                 }
               }
@@ -181,10 +176,7 @@ export async function POST(request: NextRequest) {
                   try {
                     parsedContent = JSON.parse(codeBlockMatch[1]);
                   } catch (e) {
-                    console.log(
-                      `Method 3 failed for chapter ${chapter}:`,
-                      e.message
-                    );
+                    console.log(e, `Method 3 failed for chapter ${chapter}:`);
                   }
                 }
               }
@@ -198,10 +190,7 @@ export async function POST(request: NextRequest) {
                   try {
                     parsedContent = JSON.parse(markersMatch[1]);
                   } catch (e) {
-                    console.log(
-                      `Method 4 failed for chapter ${chapter}:`,
-                      e.message
-                    );
+                    console.log(`Method 4 failed for chapter ${chapter}:`, e);
                   }
                 }
               }
@@ -242,30 +231,33 @@ export async function POST(request: NextRequest) {
                       `Method 5 succeeded for chapter ${chapter} - completed incomplete JSON`
                     );
                   } catch (e) {
-                    console.log(
-                      `Method 5 failed for chapter ${chapter}:`,
-                      e.message
-                    );
+                    console.log(`Method 5 failed for chapter ${chapter}:`, e);
                   }
                 }
               }
-              
+
               // Method 6: Try to extract and complete JSON from code blocks with incomplete content
               if (!parsedContent) {
-                const codeBlockMatch = aiResponse.match(/```json\s*(\{[\s\S]*?)$/);
+                const codeBlockMatch = aiResponse.match(
+                  /```json\s*(\{[\s\S]*?)$/
+                );
                 if (codeBlockMatch) {
                   try {
                     let incompleteJson = codeBlockMatch[1];
-                    
+
                     // If the JSON ends with a comma, remove it
-                    incompleteJson = incompleteJson.replace(/,\s*$/, '');
-                    
+                    incompleteJson = incompleteJson.replace(/,\s*$/, "");
+
                     // Count brackets and complete
-                    let openBraces2 = (incompleteJson.match(/\{/g) || []).length;
-                    let closeBraces2 = (incompleteJson.match(/\}/g) || []).length;
-                    let openBrackets2 = (incompleteJson.match(/\[/g) || []).length;
-                    let closeBrackets2 = (incompleteJson.match(/\]/g) || []).length;
-                    
+                    let openBraces2 = (incompleteJson.match(/\{/g) || [])
+                      .length;
+                    let closeBraces2 = (incompleteJson.match(/\}/g) || [])
+                      .length;
+                    let openBrackets2 = (incompleteJson.match(/\[/g) || [])
+                      .length;
+                    let closeBrackets2 = (incompleteJson.match(/\]/g) || [])
+                      .length;
+
                     // Add missing closing brackets
                     while (closeBrackets2 < openBrackets2) {
                       incompleteJson += "]";
@@ -275,34 +267,42 @@ export async function POST(request: NextRequest) {
                       incompleteJson += "}";
                       closeBraces2++;
                     }
-                    
+
                     parsedContent = JSON.parse(incompleteJson);
-                    console.log(`Method 6 succeeded for chapter ${chapter} - completed code block JSON`);
+                    console.log(
+                      `Method 6 succeeded for chapter ${chapter} - completed code block JSON`
+                    );
                   } catch (e) {
-                    console.log(`Method 6 failed for chapter ${chapter}:`, e.message);
+                    console.log(`Method 6 failed for chapter ${chapter}:`, e);
                   }
                 }
               }
-              
+
               // Method 7: Try to complete JSON that ends with incomplete object
               if (!parsedContent) {
-                const incompleteObjectMatch = aiResponse.match(/\{[\s\S]*"dialogues"\s*:\s*\[[\s\S]*\{[\s\S]*"role"\s*:\s*"[^"]*"[\s\S]*"text"\s*:\s*"[^"]*$/);
+                const incompleteObjectMatch = aiResponse.match(
+                  /\{[\s\S]*"dialogues"\s*:\s*\[[\s\S]*\{[\s\S]*"role"\s*:\s*"[^"]*"[\s\S]*"text"\s*:\s*"[^"]*$/
+                );
                 if (incompleteObjectMatch) {
                   try {
                     let incompleteJson = incompleteObjectMatch[0];
-                    
+
                     // Remove trailing comma if exists
-                    incompleteJson = incompleteJson.replace(/,\s*$/, '');
-                    
+                    incompleteJson = incompleteJson.replace(/,\s*$/, "");
+
                     // Add closing quote and brackets
                     incompleteJson += '"';
-                    
+
                     // Count and complete brackets
-                    let openBraces3 = (incompleteJson.match(/\{/g) || []).length;
-                    let closeBraces3 = (incompleteJson.match(/\}/g) || []).length;
-                    let openBrackets3 = (incompleteJson.match(/\[/g) || []).length;
-                    let closeBrackets3 = (incompleteJson.match(/\]/g) || []).length;
-                    
+                    let openBraces3 = (incompleteJson.match(/\{/g) || [])
+                      .length;
+                    let closeBraces3 = (incompleteJson.match(/\}/g) || [])
+                      .length;
+                    let openBrackets3 = (incompleteJson.match(/\[/g) || [])
+                      .length;
+                    let closeBrackets3 = (incompleteJson.match(/\]/g) || [])
+                      .length;
+
                     while (closeBrackets3 < openBrackets3) {
                       incompleteJson += "]";
                       closeBrackets3++;
@@ -311,11 +311,13 @@ export async function POST(request: NextRequest) {
                       incompleteJson += "}";
                       closeBraces3++;
                     }
-                    
+
                     parsedContent = JSON.parse(incompleteJson);
-                    console.log(`Method 7 succeeded for chapter ${chapter} - completed incomplete object JSON`);
+                    console.log(
+                      `Method 7 succeeded for chapter ${chapter} - completed incomplete object JSON`
+                    );
                   } catch (e) {
-                    console.log(`Method 7 failed for chapter ${chapter}:`, e.message);
+                    console.log(`Method 7 failed for chapter ${chapter}:`, e);
                   }
                 }
               }

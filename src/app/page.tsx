@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -100,6 +101,16 @@ export default function Home() {
     }
   }, [selectedTruyen]);
 
+  // Auto-sync truyện selection across tabs
+  useEffect(() => {
+    // When title changes in crawl tab, sync to other tabs
+    if (title && activeTab === "crawl") {
+      setSelectedTruyen(title);
+      setSelectedTruyenForAudio(title);
+      setSelectedTruyenForMerge(title);
+    }
+  }, [title, activeTab]);
+
   const loadTruyenList = async () => {
     try {
       const response = await fetch("/api/truyen");
@@ -132,6 +143,11 @@ export default function Home() {
 
   const handleTitleChange = (value: string) => {
     setTitle(value);
+
+    // Auto-set selected truyện for other tabs when typing
+    setSelectedTruyen(value);
+    setSelectedTruyenForAudio(value);
+    setSelectedTruyenForMerge(value);
   };
 
   const addCrawledTitle = (newTitle: string) => {
@@ -153,6 +169,11 @@ export default function Home() {
   const selectCrawledTitle = (selectedTitle: string) => {
     setTitle(selectedTitle);
     setShowTitleDropdown(false);
+
+    // Auto-set selected truyện for other tabs
+    setSelectedTruyen(selectedTitle);
+    setSelectedTruyenForAudio(selectedTitle);
+    setSelectedTruyenForMerge(selectedTitle);
   };
 
   const handleCrawl = async () => {
@@ -514,21 +535,39 @@ export default function Home() {
           </Button>
           <Button
             variant={activeTab === "convert" ? "default" : "outline"}
-            onClick={() => setActiveTab("convert")}
+            onClick={() => {
+              setActiveTab("convert");
+              // Auto-sync truyện from crawl tab if not set
+              if (!selectedTruyen && title) {
+                setSelectedTruyen(title);
+              }
+            }}
             className="flex-1"
           >
             🔄 Convert JSON
           </Button>
           <Button
             variant={activeTab === "generate-audio" ? "default" : "outline"}
-            onClick={() => setActiveTab("generate-audio")}
+            onClick={() => {
+              setActiveTab("generate-audio");
+              // Auto-sync truyện from crawl tab if not set
+              if (!selectedTruyenForAudio && title) {
+                setSelectedTruyenForAudio(title);
+              }
+            }}
             className="flex-1"
           >
             🔊 Generate Audio
           </Button>
           <Button
             variant={activeTab === "merge-audio" ? "default" : "outline"}
-            onClick={() => setActiveTab("merge-audio")}
+            onClick={() => {
+              setActiveTab("merge-audio");
+              // Auto-sync truyện from crawl tab if not set
+              if (!selectedTruyenForMerge && title) {
+                setSelectedTruyenForMerge(title);
+              }
+            }}
             className="flex-1"
           >
             🎵 Merge Audio

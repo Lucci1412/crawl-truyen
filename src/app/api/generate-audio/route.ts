@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest } from "next/server";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -158,7 +159,6 @@ if __name__ == "__main__":
         }
 
         // Process all dialogues in parallel with limited concurrency
-        const maxConcurrent = 5; // Limit concurrent processes
         const processDialogue = async (item: {
           chapter: number;
           dialogueIndex: number;
@@ -261,7 +261,7 @@ if __name__ == "__main__":
               controller.enqueue(
                 encoder.encode(
                   `data: ${JSON.stringify({
-                    message: `Chương ${chapter} - lỗi generate audio cho ${role} (lần thử ${retryCount}/${maxRetries}): ${error.message}`,
+                    message: `Chương ${chapter} - lỗi generate audio cho ${role} (lần thử ${retryCount}/${maxRetries}): ${error}`,
                     chapter,
                     dialogueIndex,
                     type: "retry",

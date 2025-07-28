@@ -339,20 +339,26 @@ export class TruyenFullCrawler {
         content = content.replace(/\n{3,}/g, "\n\n");
 
         // Remove navigation and footer content
-        content = content.replace(/Chương trước.*?Chương tiếp/gs, "");
-        content = content.replace(/Báo lỗi chương.*?Bình luận/gs, "");
-        content = content.replace(/Website Truyện Full Mới.*?Miễn phí/gs, "");
-        content = content.replace(/genres\s*=\s*JSON\.parse.*?$/gs, "");
-        content = content.replace(/story=\{.*?\};/gs, "");
-        content = content.replace(/chapterID=.*?;/gs, "");
-        content = content.replace(/chapNo=.*?;/gs, "");
-        content = content.replace(/Truyện Nghiện Full.*?Khác/gs, "");
-        content = content.replace(/ISO3166.*?License\./gs, "");
-        content = content.replace(/Hoạt động theo giấy phép.*?License\./gs, "");
+        content = content.replace(/Chương trước[\s\S]*?Chương tiếp/g, "");
+        content = content.replace(/Báo lỗi chương[\s\S]*?Bình luận/g, "");
+        content = content.replace(
+          /Website Truyện Full Mới[\s\S]*?Miễn phí/g,
+          ""
+        );
+        content = content.replace(/genres\s*=\s*JSON\.parse[\s\S]*?$/g, "");
+        content = content.replace(/story=\{[\s\S]*?\};/g, "");
+        content = content.replace(/chapterID=[\s\S]*?;/g, "");
+        content = content.replace(/chapNo=[\s\S]*?;/g, "");
+        content = content.replace(/Truyện Nghiện Full[\s\S]*?Khác/g, "");
+        content = content.replace(/ISO3166[\s\S]*?License\./g, "");
+        content = content.replace(
+          /Hoạt động theo giấy phép[\s\S]*?License\./g,
+          ""
+        );
 
         // Remove any remaining navigation links
-        content = content.replace(/SiteMap.*?$/gs, "");
-        content = content.replace(/Đọc Truyện Chữ Full.*?$/gs, "");
+        content = content.replace(/SiteMap[\s\S]*?$/g, "");
+        content = content.replace(/Đọc Truyện Chữ Full[\s\S]*?$/g, "");
 
         // Clean up any remaining extra whitespace
         content = content.replace(/\s+/g, " ").trim();
